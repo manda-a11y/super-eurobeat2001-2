@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SUPER EUROBEAT BEST 50 — Pair Ranking</title>
+<style>
+:root{color-scheme:dark;--bg:#10131c;--panel:#1a2030;--panel2:#222b40;--line:#34415d;--text:#f4f6fb;--muted:#aab5ca;--accent:#ffb347;--accent2:#ff6f91;--good:#69d6a6}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#202a42 0,#10131c 55%);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+main{width:min(980px,100%);margin:auto;padding:24px 16px 56px}
+header{text-align:center;margin:12px 0 24px}h1{font-size:clamp(1.55rem,4vw,2.5rem);margin:0 0 8px;letter-spacing:.03em}header p{color:var(--muted);margin:0}
+.panel{background:linear-gradient(145deg,var(--panel),#171d2b);border:1px solid var(--line);border-radius:18px;padding:20px;margin:14px 0;box-shadow:0 12px 30px #0003}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.row>*{flex:1}
+button{border:0;border-radius:12px;padding:13px 16px;font-weight:750;font-size:1rem;cursor:pointer;background:var(--accent);color:#17120a}
+button:disabled{opacity:.4;cursor:not-allowed}button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line)}button.pink{background:var(--accent2);color:#210b13}button.green{background:var(--good);color:#092016}
+.small{font-size:.88rem;color:var(--muted);line-height:1.6}.status{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:.9rem;margin-bottom:10px}
+.progress{height:9px;background:#0c1019;border-radius:20px;overflow:hidden;margin:10px 0 18px}.bar{height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .25s}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
+.song{min-height:180px;background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;justify-content:center;text-align:center}
+.song .side{font-size:.8rem;color:var(--accent);font-weight:800;letter-spacing:.1em}.song h2{font-size:clamp(1.1rem,3vw,1.65rem);margin:12px 0 6px}.song .artist{font-size:1rem;color:#d8deeb}.song .album{font-size:.78rem;color:var(--muted);margin-top:12px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.actions button{min-height:54px}.actions .wide{grid-column:1/-1}
+#ranking{padding-left:28px}#ranking li{padding:8px 6px;border-bottom:1px solid #ffffff12}#ranking .artist{color:var(--muted);font-size:.9rem}
+.hidden{display:none!important}.pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:5px 10px;color:var(--muted);font-size:.8rem;margin:3px}
+.notice{border-left:3px solid var(--accent);padding:10px 13px;background:#ffb34712;color:#e9dfcb;border-radius:8px;font-size:.9rem;line-height:1.55}
+.error{color:#ff9eae}.success{color:var(--good)}a{color:#ffd18a}
+@media(max-width:600px){main{padding:16px 12px 40px}.panel{padding:15px}.cards{grid-template-columns:1fr;gap:10px}.song{min-height:140px}.actions{grid-template-columns:1fr 1fr}.status{font-size:.8rem}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>SUPER EUROBEAT <span style="color:var(--accent)">BEST 50</span></h1>
+  <p>2001–2002 / PAIR RANKING</p>
+</header>
+
+<section id="loading" class="panel">
+  <h2>楽曲データを読み込んでいます</h2>
+  <p id="loadMsg" class="small">Eurobeat Wikiから指定アルバムのDisc 1 / CDトラックを取得中です。</p>
+  <div class="progress"><div id="loadBar" class="bar"></div></div>
+  <button id="retry" class="secondary hidden" onclick="loadAlbums()">再読み込み</button>
+  <p class="small">初回のみインターネット接続が必要です。取得した曲目とランキングの進行状況は、このブラウザ内に保存できます。</p>
+</section>
+
+<section id="intro" class="panel hidden">
+  <h2>ランキングを開始</h2>
+  <div id="datasetInfo" class="small"></div>
+  <div class="notice" style="margin:14px 0">
+    比較は総当たりではありません。曲を1曲ずつ既存の上位候補に二分探索で挿入し、比較回数を抑えます。全曲の候補判定が終わると、その時点のベスト50を確定します。
+  </div>
+  <p class="small">「どちらも好き」は同順位扱い。「どちらの曲も知らない」は、その2曲をランキング対象外にします。結果はあなたの選択に基づく個人ランキングです。</p>
+  <div class="row" style="margin-top:16px">
+    <button id="startBtn" onclick="startRanking()">ランキング開始</button>
+    <button class="secondary" onclick="resumeRanking()">保存データから再開</button>
+  </div>
+  <p class="small" id="savedInfo"></p>
+</section>
+
+<section id="game" class="panel hidden">
+  <div class="status"><span id="countLabel">比較 0</span><span id="poolLabel">候補 0曲</span></div>
+  <div class="progress"><div id="gameBar" class="bar"></div></div>
+  <div class="status"><span id="phaseLabel">候補曲を選定中</span><span id="remainingLabel"></span></div>
+  <div class="cards">
+    <article class="song"><div class="side">LEFT</div><h2 id="leftTitle">—</h2><div class="artist" id="leftArtist"></div><div class="album" id="leftAlbum"></div></article>
+    <article class="song"><div class="side">RIGHT</div><h2 id="rightTitle">—</h2><div class="artist" id="rightArtist"></div><div class="album" id="rightAlbum"></div></article>
+  </div>
+  <div class="actions">
+    <button class="secondary" onclick="choose('left')">左の曲が好き</button>
+    <button class="secondary" onclick="choose('right')">右の曲が好き</button>
+    <button class="pink wide" onclick="choose('tie')">どちらも好き（同順位）</button>
+    <button class="secondary wide" onclick="choose('unknown')">どちらの曲も知らない</button>
+  </div>
+  <p class="small" style="text-align:center;margin-top:14px">選択は自動保存されます。画面を閉じても、同じブラウザなら続きから再開できます。</p>
+</section>
+
+<section id="done" class="panel hidden">
+  <h2><span class="success">BEST 50 決定！</span></h2>
+  <p id="doneSummary" class="small"></p>
+  <div class="row" style="margin:14px 0">
+    <button onclick="downloadCSV()">CSVを書き出す</button>
+    <button class="secondary" onclick="copyRanking()">ランキングをコピー</button>
+    <button class="secondary" onclick="showRanking()">ランキング表示</button>
+  </div>
+  <ol id="ranking"></ol>
+  <button class="secondary" style="width:100%;margin-top:15px" onclick="resetAll()">最初からやり直す</button>
+</section>
+
+<section class="panel">
+  <h3>対象アルバム</h3>
+  <div id="albumTags">
+    <span class="pill">SEB 119</span><span class="pill">121–122</span><span class="pill">124–126</span><span class="pill">128–129</span><span class="pill">131–132</span>
+    <span class="pill">EUROMACH 9</span><span class="pill">11–15</span>
+  </div>
+  <p class="small">各作品の最初の楽曲トラック表（Disc 1 / CD）だけを採用し、Disc 2・ボーナスディスクは読み込みません。曲目の取得に失敗した作品がある場合は、開始前にエラーとして表示します。</p>
+  <p class="small">出典：<a href="https://eurobeat.fandom.com/wiki/Super_Eurobeat" target="_blank" rel="noopener">Eurobeat Wiki — Super Eurobeat</a> ／ <a href="https://eurobeat.fandom.com/wiki/Euromach" target="_blank" rel="noopener">Eurobeat Wiki — Euromach</a></p>
+</section>
+</main>
+
+<script>
+const ALBUMS = [
+ {id:"seb119",label:"SUPER EUROBEAT VOL.119",page:"Super_Eurobeat_Vol._119"},
+ {id:"seb121",label:"SUPER EUROBEAT VOL.121",page:"Super_Eurobeat_Vol._121"},
+ {id:"seb122",label:"SUPER EUROBEAT VOL.122",page:"Super_Eurobeat_Vol._122"},
+ {id:"seb124",label:"SUPER EUROBEAT VOL.124",page:"Super_Eurobeat_Vol._124"},
+ {id:"seb125",label:"SUPER EUROBEAT VOL.125",page:"Super_Eurobeat_Vol._125"},
+ {id:"seb126",label:"SUPER EUROBEAT VOL.126",page:"Super_Eurobeat_Vol._126"},
+ {id:"seb128",label:"SUPER EUROBEAT VOL.128",page:"Super_Eurobeat_Vol._128"},
+ {id:"seb129",label:"SUPER EUROBEAT VOL.129",page:"Super_Eurobeat_Vol._129"},
+ {id:"seb131",label:"SUPER EUROBEAT VOL.131",page:"Super_Eurobeat_Vol._131"},
+ {id:"seb132",label:"SUPER EUROBEAT VOL.132",page:"Super_Eurobeat_Vol._132"},
+ {id:"em9",label:"EUROMACH 9",page:"Super_Eurobeat_Presents_Euromach_9"},
+ {id:"em11",label:"EUROMACH 11",page:"Super_Eurobeat_Presents_Euromach_11"},
+ {id:"em12",label:"EUROMACH 12",page:"Super_Eurobeat_Presents_Euromach_12"},
+ {id:"em13",label:"EUROMACH 13",page:"Super_Eurobeat_Presents_Euromach_13"},
+ {id:"em14",label:"EUROMACH 14",page:"Super_Eurobeat_Presents_Euromach_14"},
+ {id:"em15",label:"EUROMACH 15",page:"Super_Eurobeat_Presents_Euromach_15"}
+];
+const STORE="se_b50_pair_v1";
+let songs=[],state=null;
+
+const $=id=>document.getElementById(id);
+function show(id){["loading","intro","game","done"].forEach(x=>$(x).classList.toggle("hidden",x!==id))}
+function norm(s){return (s||"").replace(/\[[^\]]*\]/g,"").replace(/\s+/g," ").trim()}
+function parseTrackTable(html, album){
+  const doc=new DOMParser().parseFromString(html,"text/html");
+  const tables=[...doc.querySelectorAll("table")];
+  for(const table of tables){
+    const heads=[...table.querySelectorAll("tr")].slice(0,2).flatMap(tr=>[...tr.querySelectorAll("th,td")]).map(x=>norm(x.textContent).toLowerCase());
+    const si=heads.findIndex(x=>x==="song"||x.includes("song"));
+    const ai=heads.findIndex(x=>x==="artist"||x.includes("artist"));
+    if(si<0||ai<0) continue;
+    const rows=[...table.querySelectorAll("tr")].slice(1);
+    const found=[];
+    for(const tr of rows){
+      const cells=[...tr.querySelectorAll("td")];
+      if(cells.length<=Math.max(si,ai))continue;
+      const title=norm(cells[si]?.textContent), artist=norm(cells[ai]?.textContent);
+      if(!title||!artist||/^(song|artist)$/i.test(title))continue;
+      found.push({id:album.id+"_"+found.length,title,artist,album:album.label});
+    }
+    if(found.length)return found;
+  }
+  return [];
+}
+async function fetchAlbum(album){
+  const url="https://eurobeat.fandom.com/api.php?action=parse&page="+encodeURIComponent(album.page)+"&prop=text&format=json&origin=*";
+  const res=await fetch(url);
+  if(!res.ok)throw new Error("HTTP "+res.status);
+  const data=await res.json();
+  if(data.error)throw new Error(data.error.info||"Wiki API error");
+  const html=data.parse?.text?.["*"]||"";
+  const tracks=parseTrackTable(html,album);
+  if(!tracks.length)throw new Error("曲目テーブルを読み取れませんでした");
+  return tracks;
+}
+async function loadAlbums(){
+  show("loading");$("retry").classList.add("hidden");$("loadMsg").textContent="全16作品を取得しています…";
+  let all=[],errors=[];
+  for(let i=0;i<ALBUMS.length;i++){
+    const a=ALBUMS[i];$("loadMsg").textContent=`取得中：${a.label}（${i+1}/${ALBUMS.length}）`;
+    $("loadBar").style.width=((i+1)/ALBUMS.length*100)+"%";
+    try{const tracks=await fetchAlbum(a);all.push(...tracks);}
+    catch(e){errors.push(a.label+"： "+e.message);}
+  }
+  if(errors.length){
+    $("loadMsg").innerHTML='<span class="error">一部のアルバムを取得できませんでした。</span><br>'+errors.map(x=>escapeHtml(x)).join("<br>")+'<br><br>通信環境を確認して再読み込みしてください。';
+    $("retry").classList.remove("hidden");return;
+  }
+  // Preserve different album appearances, but remove exact duplicate rows within the same album.
+  songs=all;
+  if(songs.length<50){$("loadMsg").textContent=`取得曲数が${songs.length}曲のため、ベスト50を作れません。Wikiの曲目表を確認してください。`;$("retry").classList.remove("hidden");return;}
+  $("datasetInfo").textContent=`全${songs.length}曲を読み込みました。16作品のDisc 1 / CD収録曲が対象です。`;
+  const saved=localStorage.getItem(STORE);
+  $("savedInfo").textContent=saved?"保存済みのランキング進行状況があります。「保存データから再開」で続けられます。":"ランキングの進行状況は自動保存されます。";
+  show("intro");
+}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function save(){localStorage.setItem(STORE,JSON.stringify(state));}
+function startRanking(){
+  state={queue:shuffle([...songs]),index:0,ranked:[],unknown:[],comparisons:0,current:null,lo:0,hi:0,mid:0,phase:"insert",tieIds:[],done:false};
+  nextSong();
+}
+function resumeRanking(){
+  const raw=localStorage.getItem(STORE);if(!raw){alert("保存データがありません。");return;}
+  try{state=JSON.parse(raw);if(!state.queue||!state.ranked)throw 0;renderGame();}
+  catch(e){alert("保存データを読み込めませんでした。最初から開始してください。");}
+}
+function nextSong(){
+  while(state.index<state.queue.length&&state.ranked.length>=50&&state.queue[state.index].skip)state.index++;
+  if(state.index>=state.queue.length){finish();return;}
+  state.current=state.queue[state.index];state.lo=0;state.hi=Math.min(state.ranked.length-1,49);state.tieIds=[];
+  if(state.ranked.length===0){state.ranked.push(state.current);state.index++;nextSong();return;}
+  state.phase="insert";askCompare();save();
+}
+function askCompare(){
+  if(state.lo>state.hi){
+    state.ranked.splice(state.lo,0,state.current);
+    if(state.ranked.length>50)state.ranked.length=50;
+    state.index++;nextSong();return;
+  }
+  state.mid=Math.floor((state.lo+state.hi)/2);
+  renderGame();save();
+}
+function renderGame(){
+  if(!state){show("intro");return;}
+  if(state.done){finish();return;}
+  const a=state.current,b=state.ranked[state.mid];
+  if(!a||!b){nextSong();return;}
+  $("leftTitle").textContent=a.title;$("leftArtist").textContent=a.artist;$("leftAlbum").textContent=a.album;
+  $("rightTitle").textContent=b.title;$("rightArtist").textContent=b.artist;$("rightAlbum").textContent=b.album;
+  $("countLabel").textContent=`比較 ${state.comparisons}回`;
+  $("poolLabel").textContent=`上位候補 ${state.ranked.length}曲`;
+  $("phaseLabel").textContent=`候補曲 ${state.index+1} / ${state.queue.length}`;
+  $("remainingLabel").textContent=`残り ${state.queue.length-state.index-1}曲`;
+  $("gameBar").style.width=(state.index/state.queue.length*100)+"%";
+  show("game");
+}
+function choose(choice){
+  if(!state||state.done)return;
+  const a=state.current,b=state.ranked[state.mid];state.comparisons++;
+  if(choice==="unknown"){
+    state.unknown.push(a,b);
+    state.ranked.splice(state.mid,1);
+    state.current=null;state.index++;nextSong();return;
+  }
+  if(choice==="left"){state.hi=state.mid-1;}
+  else if(choice==="right"){state.lo=state.mid+1;}
+  else if(choice==="tie"){
+    // Put the challenger beside the compared track; this records an adjacent tie.
+    state.ranked.splice(state.mid+1,0,a);
+    if(state.ranked.length>50)state.ranked.length=50;
+    state.index++;nextSong();return;
+  }
+  askCompare();
+}
+function finish(){
+  state.done=true;save();
+  const list=state.ranked.slice(0,50);
+  $("doneSummary").textContent=`比較 ${state.comparisons} 回で確定。ランキング対象 ${list.length} 曲／「どちらも知らない」で除外した曲 ${state.unknown.length} 曲。`;
+  $("ranking").innerHTML=list.map((s,i)=>`<li><strong>${escapeHtml(s.title)}</strong> <span class="artist">— ${escapeHtml(s.artist)}</span><br><span class="small">${escapeHtml(s.album)}</span></li>`).join("");
+  show("done");
+}
+function showRanking(){ $("ranking").scrollIntoView({behavior:"smooth",block:"start"}); }
+function rankingText(){return state.ranked.slice(0,50).map((s,i)=>`${i+1}. ${s.title} — ${s.artist} (${s.album})`).join("\n");}
+function copyRanking(){navigator.clipboard?.writeText(rankingText()).then(()=>alert("ランキングをコピーしました。")).catch(()=>alert("コピーできませんでした。"));}
+function downloadCSV(){
+  const rows=[["Rank","Song","Artist","Album"],...state.ranked.slice(0,50).map((s,i)=>[i+1,s.title,s.artist,s.album])];
+  const csv="\uFEFF"+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\r\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="super_eurobeat_best50.csv";a.click();URL.revokeObjectURL(a.href);
+}
+function resetAll(){
+  if(!confirm("進行状況とランキングを消して最初からやり直しますか？"))return;
+  localStorage.removeItem(STORE);state=null;show("intro");
+}
+loadAlbums();
+</script>
+</body>
+</html>
